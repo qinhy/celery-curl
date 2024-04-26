@@ -1,5 +1,5 @@
 # celery-curl
-Do curl mainly for GPTs
+Do curl mainly for GPTs on task system.
 
 # start worker
 python -m celery -A celerycurl.celerytasks worker -l info --concurrency=2 -P threads
