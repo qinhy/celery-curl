@@ -18,7 +18,7 @@ def check_status(task_id: str):
     result = AsyncResult(task_id)
     return {'id':task_id, 'status':result.status, 'result':result.result}
 
-@fastapp.get(prefix+'/stop_task_id/{task_id}')
+@fastapp.get(prefix+'/stop/{task_id}')
 def stop(task_id:str):
     task = celerytasks.revoke.delay(task_id=task_id)
     return {'id':task.id}
@@ -48,7 +48,7 @@ def set_api_key(key: str = Body(..., embed=True)):
     os.environ['OPENAI_API_KEY'] = key
     return {'message': 'API key updated successfully'}
 
-@fastapp.get(f"{prefix}/openai_chat_completions/")
+@fastapp.get(f"{prefix}/openai/chat/completions/")
 def openai_chat_completions(messages: str = Query(
                                 '{"messages":[{"role": "user", "content": "Tell me your name."}]}'),
                             model: str = Query("gpt-3.5-turbo"),
@@ -72,7 +72,7 @@ def openai_chat_completions(messages: str = Query(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@fastapp.get(f"{prefix}/openai_embeddings/")
+@fastapp.get(f"{prefix}/openai/embeddings/")
 def openai_embeddings(input_text: str = Query("Your text string goes here", alias="input"),
                         model: str = Query("text-embedding-3-small"),
                         url: str = Query("https://api.openai.com/v1/embeddings")):
@@ -81,6 +81,25 @@ def openai_embeddings(input_text: str = Query("Your text string goes here", alia
             url=url,
             input_text=input_text,
             model=model,
+            api_key=os.getenv('OPENAI_API_KEY'),
+        )
+        return {'id': task.id}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
+@fastapp.get(f"{prefix}/openai/audio/speech/")
+def openai_audio_speech(input: str = Query("Today is a wonderful day to build something people love!"),
+                        model: str = Query("tts-1"), 
+                        voice: str = Query("alloy"),
+                        url: str = Query("https://api.openai.com/v1/audio/speech"),
+                        output_file: str = Query("speech.mp3")):
+    try:
+        task = celerytasks.openai_audio_speech.delay(
+            input=input,
+            model=model,
+            voice=voice,
+            url=url,
+            output_file=output_file,
             api_key=os.getenv('OPENAI_API_KEY'),
         )
         return {'id': task.id}

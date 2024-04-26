@@ -14,7 +14,7 @@ os.environ.setdefault('CELERY_TASK_SERIALIZER', 'json')
 ####################################################################################
 celery_app = Celery('tasks')
 
-def WrappTask(task:Task):
+def WrapTask(task:Task):
     def update_progress_state(progress=1.0,msg=''):
         task.update_state(state='PROGRESS',meta={'progress': progress,'msg':msg})
         task.send_event('task-progress', result={'progress': progress})
@@ -39,7 +39,7 @@ class CeleryTaskManager:
                             stream=True,
                             api_key=os.getenv('OPENAI_API_KEY'),
                             url="https://api.openai.com/v1/chat/completions",):
-        t = WrappTask(t)
+        t = WrapTask(t)
         t.progress(0.0)
 
         headers = {
@@ -84,7 +84,7 @@ class CeleryTaskManager:
                             model="text-embedding-3-small",
                             api_key=os.getenv('OPENAI_API_KEY'),
                             url="https://api.openai.com/v1/embeddings"):
-        t = WrappTask(t)
+        t = WrapTask(t)
         t.progress(0.0, "Starting to generate embeddings")
 
         headers = {
@@ -101,6 +101,39 @@ class CeleryTaskManager:
             if response.status_code == 200:
                 t.progress(1.0, "Embeddings generated successfully")
                 return response.json()
+            else:
+                response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            t.error(str(e))
+            raise
+
+    @staticmethod
+    @celery_app.task(bind=True)
+    def openai_audio_speech(t: Task, input="Today is a wonderful day to build something people love!",
+                                model="tts-1", voice="alloy",
+                                api_key=os.getenv('OPENAI_API_KEY'),
+                                url="https://api.openai.com/v1/audio/speech",
+                                output_file='speech.mp3'):
+        t = WrapTask(t)
+        t.progress(0.0, "Starting speech synthesis")
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        data = {
+            "model": model,
+            "input": input,
+            "voice": voice
+        }
+
+        try:
+            response = requests.post(url, json=data, headers=headers)
+            if response.status_code == 200:
+                with open(output_file, 'wb') as f:
+                    f.write(response.content)
+                t.progress(1.0, "Speech file generated successfully")
+                return output_file
             else:
                 response.raise_for_status()
         except requests.exceptions.RequestException as e:
