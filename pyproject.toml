@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "celery-curl"
+version = "0.1.0"
+description = "Do curl mainly for GPTs"
+authors = ["koki.chin <qinhunagyi@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+celery = "^5.4.0"
+fastapi = "^0.110.2"
+flower = "^2.0.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

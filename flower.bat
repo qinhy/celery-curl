@@ -1,0 +1,1 @@
+python -m celery -A celerycurl.celerytasks flower --url_prefix=flower --port=5555
