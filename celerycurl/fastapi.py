@@ -4,6 +4,7 @@ from fastapi import FastAPI, Query, HTTPException, Body
 from celery.result import AsyncResult
 from fastapi.responses import RedirectResponse
 from .celerytasks import CeleryTaskManager as celerytasks
+from .celerytasks import celery_app
 
 fastapp = FastAPI()#root_path="/fastapi")
 prefix="/api"
@@ -22,6 +23,21 @@ def stop(task_id:str):
     task = celerytasks.revoke.delay(task_id=task_id)
     return {'id':task.id}
 
+def get_task_result(task_id: str):
+    task = celery_app.AsyncResult(task_id)
+    if not task.ready():
+        return {"status": "pending"}
+    if task.state == 'FAILURE':
+        return {"status": "failed", "error": str(task.result)}
+    return {"result": task.result}
+
+@fastapp.get(prefix+"/task_result/{task_id}")
+def task_result(task_id: str):
+    try:
+        return get_task_result(task_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @fastapp.get(f"{prefix}/openai_api_key_status/")
 def get_api_key_status():
     is_set = "set" if os.getenv('OPENAI_API_KEY') else "not set"
@@ -54,4 +70,19 @@ def openai_chat_completions(messages: str = Query(
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=400, detail="JSON decoding error in messages")
     except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@fastapp.get(f"{prefix}/openai_embeddings/")
+def openai_embeddings(input_text: str = Query("Your text string goes here", alias="input"),
+                        model: str = Query("text-embedding-3-small"),
+                        url: str = Query("https://api.openai.com/v1/embeddings")):
+    try:
+        task = celerytasks.openai_embeddings.delay(
+            url=url,
+            input_text=input_text,
+            model=model,
+            api_key=os.getenv('OPENAI_API_KEY'),
+        )
+        return {'id': task.id}
+    except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
